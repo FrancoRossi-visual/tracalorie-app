@@ -2,8 +2,8 @@ class CalorieTracker {
   constructor() {
     this._calorieLimit = Storage.getCalorieLimit();
     this._totalCalories = Storage.getTotalCalories();
-    this._meals = [];
-    this._workouts = [];
+    this._meals = Storage.getMeals();
+    this._workouts = Storage.getWorkouts();
 
     this._displayCaloriesTotal();
     this._displayCaloriesLimit();
@@ -11,6 +11,8 @@ class CalorieTracker {
     this._displayCaloriesBurned();
     this._displayCaloriesRemaining();
     this._displayCaloriesProgress();
+
+    document.getElementById('limit').value = this._calorieLimit;
   }
 
   // Public method / API //
@@ -19,6 +21,7 @@ class CalorieTracker {
     this._meals.push(meal);
     this._totalCalories += meal.calories;
     Storage.updateTotalCalories(this._totalCalories);
+    Storage.saveMeal(meal);
     this._displayNewMeal(meal);
     this._render();
   }
@@ -27,6 +30,7 @@ class CalorieTracker {
     this._workouts.push(workout);
     this._totalCalories -= workout.calories;
     Storage.updateTotalCalories(this._totalCalories);
+    Storage.saveWorkout(workout);
     this._displayNewWorkout(workout);
     this._render();
   }
@@ -39,6 +43,7 @@ class CalorieTracker {
       this._totalCalories -= meal.calories;
       Storage.updateTotalCalories(this._totalCalories);
       this._meals.splice(index, 1);
+      Storage.removeMeal(id);
       this._render();
     }
   }
@@ -51,6 +56,7 @@ class CalorieTracker {
       this._totalCalories += workout.calories;
       Storage.updateTotalCalories(this._totalCalories);
       this._workouts.splice(index, 1);
+      Storage.removeWorkout(id);
       this._render();
     }
   }
@@ -60,6 +66,7 @@ class CalorieTracker {
     this._meals = [];
     this._workouts = [];
     Storage.updateTotalCalories(this._totalCalories);
+    Storage.clearAll();
     this._render();
   }
 
@@ -68,6 +75,11 @@ class CalorieTracker {
     Storage.setCalorieLimit(calorieLimit);
     this._displayCaloriesLimit();
     this._render();
+  }
+
+  loadItems() {
+    this._meals.forEach((meal) => this._displayNewMeal(meal));
+    this._workouts.forEach((workout) => this._displayNewWorkout(workout));
   }
 
   // Private Methods //
@@ -236,43 +248,67 @@ class Storage {
   }
 
   // meals array
-  static getMeals() {}
+  static getMeals() {
+    let meals;
+    if (localStorage.getItem('meals') === null) {
+      meals = [];
+    } else {
+      meals = JSON.parse(localStorage.getItem('meals'));
+    }
+    return meals;
+  }
+  static saveMeal(meal) {
+    const meals = Storage.getMeals();
+    meals.push(meal);
+    localStorage.setItem('meals', JSON.stringify(meals));
+  }
+  static removeMeal(id) {
+    const meals = Storage.getMeals();
+    meals.forEach((meal, index) => {
+      if (meal.id === id) {
+        meals.splice(index, 1);
+      }
+    });
+    localStorage.setItem('meals', JSON.stringify(meals));
+  }
+
+  // workouts array
+  static getWorkouts() {
+    let workouts;
+    if (localStorage.getItem('workouts') === null) {
+      workouts = [];
+    } else {
+      workouts = JSON.parse(localStorage.getItem('workouts'));
+    }
+    return workouts;
+  }
+  static saveWorkout(workout) {
+    const workouts = Storage.getWorkouts();
+    workouts.push(workout);
+    localStorage.setItem('workouts', JSON.stringify(workouts));
+  }
+  static removeWorkout(id) {
+    const workouts = Storage.getWorkouts();
+    workouts.forEach((workout, index) => {
+      if (workout.id === id) {
+        workouts.splice(index, 1);
+      }
+    });
+    localStorage.setItem('workouts', JSON.stringify(workouts));
+  }
+
+  static clearAll() {
+    localStorage.removeItem('totalCalories');
+    localStorage.removeItem('meals');
+    localStorage.removeItem('workouts');
+  }
 }
 
 class App {
   constructor() {
     this._tracker = new CalorieTracker();
-
-    document
-      .getElementById('meal-form')
-      .addEventListener('submit', this._newItem.bind(this, 'meal'));
-
-    document
-      .getElementById('workout-form')
-      .addEventListener('submit', this._newItem.bind(this, 'workout'));
-
-    document
-      .getElementById('meal-items')
-      .addEventListener('click', this._removeItem.bind(this, 'meal'));
-
-    document
-      .getElementById('workout-items')
-      .addEventListener('click', this._removeItem.bind(this, 'workout'));
-
-    document
-      .getElementById('filter-meals')
-      .addEventListener('keyup', this._filterItems.bind(this, 'meal'));
-    document
-      .getElementById('filter-workouts')
-      .addEventListener('keyup', this._filterItems.bind(this, 'workout'));
-
-    document
-      .getElementById('reset')
-      .addEventListener('click', this._reset.bind(this));
-
-    document
-      .getElementById('limit-form')
-      .addEventListener('submit', this._setLimit.bind(this));
+    this._loadEventListeners();
+    this._tracker.loadItems();
   }
 
   _newItem(type, e) {
@@ -367,6 +403,7 @@ class App {
       document.getElementById('filter-workouts').value = '';
     }
   }
+
   _setLimit(e) {
     e.preventDefault();
 
@@ -382,6 +419,39 @@ class App {
     const modalEl = document.getElementById('limit-modal');
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
+  }
+
+  _loadEventListeners() {
+    document
+      .getElementById('meal-form')
+      .addEventListener('submit', this._newItem.bind(this, 'meal'));
+
+    document
+      .getElementById('workout-form')
+      .addEventListener('submit', this._newItem.bind(this, 'workout'));
+
+    document
+      .getElementById('meal-items')
+      .addEventListener('click', this._removeItem.bind(this, 'meal'));
+
+    document
+      .getElementById('workout-items')
+      .addEventListener('click', this._removeItem.bind(this, 'workout'));
+
+    document
+      .getElementById('filter-meals')
+      .addEventListener('keyup', this._filterItems.bind(this, 'meal'));
+    document
+      .getElementById('filter-workouts')
+      .addEventListener('keyup', this._filterItems.bind(this, 'workout'));
+
+    document
+      .getElementById('reset')
+      .addEventListener('click', this._reset.bind(this));
+
+    document
+      .getElementById('limit-form')
+      .addEventListener('submit', this._setLimit.bind(this));
   }
 }
 
